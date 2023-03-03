@@ -532,7 +532,7 @@ async def trigger_fivetran_connector_sync_and_wait_for_completion(
             fivetran_credentials=fivetran_credentials,
             schedule_type=schedule_type,
         )
-        last_sync = await start_fivetran_connector_sync(
+        last_sync = await start_fivetran_connector_resync(
             connector_id=connector_id,
             fivetran_credentials=fivetran_credentials,
         )
