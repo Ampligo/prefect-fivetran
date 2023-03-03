@@ -205,6 +205,74 @@ async def start_fivetran_connector_sync(
 
 
 @task(
+    name="Start Fivetran connector resync",
+    description="Starts a Fivetran connector data resync (historical).",
+    retries=3,
+    retry_delay_seconds=10,
+)
+async def start_fivetran_connector_resync(
+    connector_id: str,
+    fivetran_credentials: FivetranCredentials,
+) -> Dict:
+    """
+    Start a Fivetran data resync.
+
+    Args:
+        connector_id: The id of the Fivetran connector to use in Prefect.
+        fivetran_credentials: The credentials to use to authenticate.
+
+    Returns:
+        The timestamp of the end of the connector's last run, or now if it
+        has not yet run.
+
+    Examples:
+        Check a Fivetran connector in Prefect
+        ```python
+        from prefect import flow
+        from prefect_fivetran import FivetranCredentials
+        from prefect_fivetran.fivetran import start_fivetran_connector_resync
+
+        @flow
+        def example_flow():
+            fivetran_credentials = FivetranCredentials(
+                    api_key="my_api_key",
+                    api_secret="my_api_secret",
+            )
+            start_fivetran_connector_resync(
+                connector_id="my_connector_id",
+                fivetran_credentials=fivetran_credentials,
+            )
+
+            example_flow()
+        ```
+    """
+    async with fivetran_credentials.get_fivetran() as fivetran_client:
+        connector_details = (
+            await fivetran_client.get_connector(connector_id=connector_id)
+        )["data"]
+        succeeded_at = connector_details["succeeded_at"]
+        failed_at = connector_details["failed_at"]
+
+        if connector_details["paused"]:
+            await fivetran_client.patch_connector(
+                connector_id=connector_id,
+                data={"paused": False},
+            )
+
+        if succeeded_at is None and failed_at is None:
+            succeeded_at = str(pendulum.now())
+
+        last_sync = (
+            succeeded_at
+            if fivetran_client.parse_timestamp(succeeded_at)
+            > fivetran_client.parse_timestamp(failed_at)
+            else failed_at
+        )
+        await fivetran_client.resync_connector(connector_id=connector_id)
+
+        return last_sync
+
+@task(
     name="Wait on a Fivetran connector data sync",
     description="Halts execution of flow until Fivetran connector data sync completes",
     retries=3,

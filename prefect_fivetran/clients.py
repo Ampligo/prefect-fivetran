@@ -109,6 +109,25 @@ class FivetranClient:
             )
         ).json()
 
+    async def resync_connector(
+        self,
+        connector_id: str,
+    ) -> str:
+        """
+        Start a Fivetran data re-sync (historical)
+        Args:
+            connector_id: ID of the Fivetran connector with which to interact.
+        Returns:
+            The timestamp of the end of the connector's last run, or now if it
+            has not yet run.
+        """
+
+        return (
+            await self.client.post(
+                "https://api.fivetran.com/v1/connectors/" + connector_id + "/resync"
+            )
+        ).json()
+    
     async def __aenter__(self):
         if self._closed:
             raise RuntimeError(
